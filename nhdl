@@ -1,5 +1,6 @@
-#!/usr/bin/fish
-#nhentai.net manga to pdf converter 
+#!/bin/sh
+#nhentai.net manga downloader
+#forked from https://github.com/SwitchAxe/nhentai-dl/
 
 if test ( echo $argv[1] | sed 's/[0-9]*//') = ""; and test (count $argv) = "1"
     set check_if_page_exists (curl -sfL "https://www.nhentai.net/g/$argv[1]")
@@ -8,10 +9,10 @@ if test ( echo $argv[1] | sed 's/[0-9]*//') = ""; and test (count $argv) = "1"
                "manga doesn't exist, aborting."
         exit
     end
-    if not test -d "temp"
-        mkdir "temp"
+    if not test -d "$argv[1]"
+        mkdir "$argv[1]"
     end
-    cd "temp"
+    cd "$argv[1]"
     if test -f 1.jpg; or test -f 1.png #if there are images from previous downloads...
         rm * #...delete them.
     end
@@ -32,25 +33,11 @@ if test ( echo $argv[1] | sed 's/[0-9]*//') = ""; and test (count $argv) = "1"
         printf "%s\n" "downloading page number $current_page_number"
         set current_page_number (expr $current_page_number + 1)
     end
-    
-    
-    for i in (seq 1 (expr $current_page_number - 1)) #from 1 to current_page_number-1
-        if test -f "$i.png" #if there's any .png file...
-            printf "%s" "converting image number $i... "
-            magick "$i.png" "$i.jpg" #...convert it to jpeg.
-            printf "%s\n" "done." 
-        end
-    end    
+
     printf "%s" "removing leftovers... "
     if test -f "*.png"    
         rm *.png #removes leftovers
     end
     rm tempindex
     printf "%s\n" "done."
-    printf "%s" "creating the pdf... "
-    img2pdf *.jpg -o "$argv[1].pdf" #final result
-    printf "%s\n" "done."
-    printf "%s"
-else
-    printf "%s\n" "$argv[1] is not a number or more than one argument was provided, aborting."
-end 
+    end
