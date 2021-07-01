@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/fish
 #nhentai.net manga downloader
 #forked from https://github.com/SwitchAxe/nhentai-dl/
 
