@@ -10,3 +10,8 @@ To run, type `./nhdl [number]` and let it run all the way through
 
 # Notes
 The script will download the images to a folder within the directory of the script, naming that directory the number of the downloaded gallery. This is a big change from the original as it would download to a `temp` folder, meaning you couldn't run multiple instances of it. Of course, this change allows for a (theoretically) infinite number of simultaneous downloads.
+
+# To-do
+- Make folder name equivalent to manga name
+- Allow for multiple arguments (codes) for simultaneous downloads on text-only systems
+- Allow user to specify download directory so it can be called from any directory and output to the same one every time
