@@ -15,3 +15,4 @@ The script will download the images to a folder within the directory of the scri
 - Make folder name equivalent to manga name
 - Allow for multiple arguments (codes) for simultaneous downloads on text-only systems
 - Allow user to specify download directory so it can be called from any directory and output to the same one every time
+- Allow for random download of user-specified tag or complete random download
