@@ -9,13 +9,16 @@ if test ( echo $argv[1] | sed 's/[0-9]*//') = ""; and test (count $argv) = "1"
         exit
     end
 
+	set title ( curl -s https://nhentai.net/g/$argv[1]/ | grep -o -P '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' )
+	echo Downloading \"$title\"
+
     #make directory for manga to go to
-    if not test -d "$argv[1]"
-        mkdir "$argv[1]"
+    if not test -d "$title"
+        mkdir "$title"
     end
 
     #delete files in directory in case the dir already exists
-    cd "$argv[1]"
+    cd "$title"
     if test -f 1.jpg; or test -f 1.png #if there are images from previous downloads...
         rm *
     end
