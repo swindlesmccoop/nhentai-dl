@@ -48,4 +48,4 @@ if test ( echo $argv[1] | sed 's/[0-9]*//') = ""; and test (count $argv) = "1"
 
     #done
     echo "Manga successfully downloaded!"
-    end
+end
