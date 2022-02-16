@@ -2,7 +2,6 @@
 
 #check if page exists
 if [ "$(echo "$1" | sed 's/[0-9]*//')" = "" ]; then
-	test "$(count $1)" = "1"
 	curl -sfL "https://www.nhentai.net/g/$1" || printf "%s\n" \ "Manga doesn't exist, aborting." && exit
 fi
 
@@ -24,10 +23,12 @@ gallery_number=$(cat tempindex | grep "window._gallery" | sed 's/\\u0022//g' | s
 
 #getting the pages
 current_page_number=1
-while test -z "$(wget "https://i.nhentai.net/galleries/$gallery_number/$current_page_number.jpg" -nv 2>&1 | grep "404: Not Found")";
-	  or test -z "$(wget "https://i.nhentai.net/galleries/$gallery_number/$current_page_number.png" -nv 2>&1 | grep "404: Not Found")";
-	  do
-		  printf "%s\n" "Downloading page $current_page_number"
+IMGFORMAT=jpg
+grep "1t.jpg" tempindex || IMGFORMAT=png
+PAGECOUNT=$(grep -Po '(?<="name"\>)[0-9]*(?=\<\/span)' tempindex)
+for i in $(seq "$PAGECOUNT"); do
+	wget "https://i.nhentai.net/galleries/$gallery_number/$current_page_number.$IMGFORMAT" -nv 2>&1
+	printf "%s\n" "Downloading page $current_page_number"
 	current_page_number="$(expr $current_page_number + 1)"
 done
 
