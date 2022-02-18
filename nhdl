@@ -1,0 +1,73 @@
+#!/bin/sh
+set -e
+
+cbz_compress () {
+	TITLE=$(grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' tempindex)
+	cd "$BOOKDIR"
+	zip -r "$TITLE".cbz "$TITLE/"
+	rm -rf "$TITLE"
+	exit
+}
+
+download () {
+	BOOKDIR="$(cat $HOME/.config/nhdl/books.dir)"
+	if [ -d "$BOOKDIR" ]; then
+		echo "Book will be stored in $BOOKDIR"
+	else
+		echo "Books directory does not exist! Default automatically set to ~/Documents/Books/"
+		echo "This can be changed by editing ~/.config/nhdl/books.dir"
+		mkdir -p "$HOME/.config/nhdl"
+		echo "$HOME/Documents/Books" > "$HOME/.config/nhdl/books.dir"
+		BOOKDIR="$HOME/Documents/Books"
+		mkdir -p "$BOOKDIR"
+	fi
+
+	if [ "$2" = "random" ]; then
+		echo "Random not implemented yet"
+		exit
+	fi
+
+	#check if manga exists
+	if [ "$(echo "$2" | sed 's/[0-9]*//')" = "" ]; then
+		curl -sfL "https://www.nhentai.net/g/$2" > /dev/null || exit
+	fi
+	
+	cd "$BOOKDIR"
+	
+	TITLE=$(curl -s "https://nhentai.net/g/$2/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")')
+	echo Downloading \"$TITLE\"
+	mkdir "$TITLE"
+	cd "$TITLE"
+	curl -s "https://nhentai.net/g/$2/" -o tempindex
+	
+	PAGENUM=1
+	IMGFORMAT=jpg
+	grep "1t.jpg" tempindex > /dev/null || IMGFORMAT=png
+	
+	PAGECOUNT=$(grep -Po '(?<="name"\>)[0-9]*(?=\<\/span)' tempindex)
+	GYARU=$(grep -Po '(?<=galleries\/)[0-9]*(?=\/cover.jpg)' tempindex | head -n 1)
+	echo ""
+	for i in $(seq $PAGECOUNT); do
+		printf "%s\n" "Downloading page $PAGENUM"
+		wget -q https://i.nhentai.net/galleries/$GYARU/$PAGENUM.$IMGFORMAT
+		PAGENUM="$(expr $PAGENUM + 1)"
+	done
+
+	while true; do
+    	read -p "Would you like to compress your manga to .cbz format? (Y/n): " yn
+    	case $yn in
+    	    [Yy]*) cbz_compress ;;
+    	    [Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && exit ;;
+    	    *) cbz_compress ;;
+    	esac
+	done
+}
+
+#if no parameters are supplied, print help
+if [ $# -eq 0 ]; then nhdl_help; fi
+
+case "$1" in
+	-d) download "$@" ;;
+	-h) nhdl_help ;;
+	--help) nhdl_help ;;
+esac
