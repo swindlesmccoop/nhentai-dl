@@ -63,6 +63,10 @@ download () {
 	done
 }
 
+nhdl_help () {
+	printf "nHentai Manga Downloader (nhdl) by swindlesmccoop\n\nUsage: nhdl [-dh] [code]\n-d, --download: (D)ownload [code] of the manga's gallery\n-h, --help: Print this (h)elp message\n" && exit 1
+}
+
 #if no parameters are supplied, print help
 if [ $# -eq 0 ]; then nhdl_help; fi
 
