@@ -1,18 +1,28 @@
 #!/bin/sh
-set -e
 
 cbz_compress () {
 	TITLE=$(grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' tempindex)
 	cd "$BOOKDIR"
-	zip -r "$TITLE".cbz "$TITLE/"
+	zip -r "$TITLE".cbz "$TITLE/" > /dev/null
 	rm -rf "$TITLE"
 	exit
 }
 
+error_msg () {
+	printf "An error has ocurred! Either you have entered an invalid gallery number, you are not connected to the internet, or there is an error in the script! If it seems to be a problem with the script, please create an Issue at\n\nhttps://git.cbps.xyz/swindlesmccoop/nhentai-dl/issues/new\n\nwith relevant information, such as the gallery code you entered."
+	exit
+}
+
 download () {
+	if [ "$2" = "random" ]; then
+		CODE="$(shuf -i 1-400000 -n 1)"
+	else
+		CODE="$2"
+	fi
+
 	BOOKDIR="$(cat $HOME/.config/nhdl/books.dir)"
 	if [ -d "$BOOKDIR" ]; then
-		echo "Book will be stored in $BOOKDIR"
+		printf "Book will be stored in $BOOKDIR/\n\n"
 	else
 		echo "Books directory does not exist! Default automatically set to ~/Documents/Books/"
 		echo "This can be changed by editing ~/.config/nhdl/books.dir"
@@ -22,45 +32,44 @@ download () {
 		mkdir -p "$BOOKDIR"
 	fi
 
-	if [ "$2" = "random" ]; then
-		echo "Random not implemented yet"
-		exit
-	fi
-
 	#check if manga exists
-	if [ "$(echo "$2" | sed 's/[0-9]*//')" = "" ]; then
-		curl -sfL "https://www.nhentai.net/g/$2" > /dev/null || exit
+	if [ "$(echo "$CODE" | sed 's/[0-9]*//')" = "" ]; then
+		curl -sfL "https://www.nhentai.net/g/$CODE" > /dev/null || error_msg
 	fi
 	
 	cd "$BOOKDIR"
 	
-	TITLE=$(curl -s "https://nhentai.net/g/$2/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")')
+	TITLE=$(curl -s "https://nhentai.net/g/$CODE/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")')
 	echo Downloading \"$TITLE\"
 	mkdir "$TITLE"
 	cd "$TITLE"
-	curl -s "https://nhentai.net/g/$2/" -o tempindex
+	curl -s "https://nhentai.net/g/$CODE/" -o tempindex
 	
 	PAGENUM=1
-	IMGFORMAT=jpg
-	grep "1t.jpg" tempindex > /dev/null || IMGFORMAT=png
 	
 	PAGECOUNT=$(grep -Po '(?<="name"\>)[0-9]*(?=\<\/span)' tempindex)
-	GYARU=$(grep -Po '(?<=galleries\/)[0-9]*(?=\/cover.jpg)' tempindex | head -n 1)
+	GYARU="$(sed "s/.*galleries//;s/cover.*//" tempindex | sed "s|/||g" | head -n 5 | tail -n 1)"
 	echo ""
 	for i in $(seq $PAGECOUNT); do
 		printf "%s\n" "Downloading page $PAGENUM"
-		wget -q https://i.nhentai.net/galleries/$GYARU/$PAGENUM.$IMGFORMAT
+		curl -sO "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.jpg" || curl -sO "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.png"
 		PAGENUM="$(expr $PAGENUM + 1)"
 	done
-
+	echo ""
 	while true; do
     	read -p "Would you like to compress your manga to .cbz format? (Y/n): " yn
     	case $yn in
-    	    [Yy]*) cbz_compress ;;
-    	    [Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && exit ;;
+    	    [Yy]*) cbz_compress && echo "Happy fapping!" && exit ;;
+    	    [Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && echo "Happy fapping!" && exit ;;
     	    *) cbz_compress ;;
     	esac
 	done
+}
+
+nhdl_search () {
+	echo "Searching for \"$2\""
+	QUERY="$(echo $2 | sed 's/ /+/g')"
+	curl -s "https://nhentai.net/search/?q=$QUERY"
 }
 
 nhdl_help () {
@@ -74,4 +83,5 @@ case "$1" in
 	-d) download "$@" ;;
 	-h) nhdl_help ;;
 	--help) nhdl_help ;;
+	-s) nhdl_search "$@" ;;
 esac
