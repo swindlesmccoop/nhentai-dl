@@ -14,3 +14,4 @@ Mark script as executable (ex: `chmod +x nhdl`)\
 # To-do
 - Allow for multiple arguments (codes) for simultaneous or walk-away downloads
 - Allow for random download of user-specified tag
+- "Next" button to scropl through pages on search

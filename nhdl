@@ -5,11 +5,7 @@ cbz_compress () {
 	cd "$BOOKDIR"
 	zip -r "$TITLE".cbz "$TITLE/" > /dev/null
 	rm -rf "$TITLE"
-	exit
-}
-
-error_msg () {
-	printf "An error has ocurred! Either you have entered an invalid gallery number, you are not connected to the internet, or there is an error in the script! If it seems to be a problem with the script, please create an Issue at\n\nhttps://git.cbps.xyz/swindlesmccoop/nhentai-dl/issues/new\n\nwith relevant information, such as the gallery code you entered."
+	echo "Happy fapping!"
 	exit
 }
 
@@ -34,42 +30,71 @@ download () {
 
 	#check if manga exists
 	if [ "$(echo "$CODE" | sed 's/[0-9]*//')" = "" ]; then
-		curl -sfL "https://www.nhentai.net/g/$CODE" > /dev/null || error_msg
+		curl -sfL "https://www.nhentai.net/g/$CODE" > /dev/null
 	fi
 	
 	cd "$BOOKDIR"
 	
-	TITLE=$(curl -s "https://nhentai.net/g/$CODE/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")')
+	TITLE="$(curl -s "https://nhentai.net/g/$CODE/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' | sed "s|/||g" | sed "s/&#x27;/'/g")"
 	echo Downloading \"$TITLE\"
+	if [ -d "$TITLE" ]; then
+		FILENUM=$(ls -1 "$TITLE" | wc -l)
+		read -p "Directory already exists, with a total of $FILENUM pages downloaded. Erase and continue? (y/N): " yn
+    	case $yn in
+        	[Yy]*) rm -rf "$TITLE" ;;
+        	[Nn]*) exit ;;
+        	*) exit ;;
+		esac
+	fi
 	mkdir "$TITLE"
 	cd "$TITLE"
+	if [ -f "$TITLE".cbz ]; then
+		read -p "CBZ file already exists. Erase and continue? (y/N): " yn
+    	case $yn in
+        	[Yy]*) rm "$TITLE".cbz && echo "Manga erased! Redownloading..." ;;
+        	[Nn]*) exit ;;
+        	*) exit ;;
+		esac
+	fi
 	curl -s "https://nhentai.net/g/$CODE/" -o tempindex
 	
 	PAGENUM=1
-	
 	PAGECOUNT=$(grep -Po '(?<="name"\>)[0-9]*(?=\<\/span)' tempindex)
 	GYARU="$(sed "s/.*galleries//;s/cover.*//" tempindex | sed "s|/||g" | head -n 5 | tail -n 1)"
 	echo ""
 	for i in $(seq $PAGECOUNT); do
 		printf "%s\n" "Downloading page $PAGENUM"
-		curl -sO "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.jpg" || curl -sO "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.png"
+		wget -q "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.jpg" || wget -q "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.png"
 		PAGENUM="$(expr $PAGENUM + 1)"
 	done
 	echo ""
 	while true; do
     	read -p "Would you like to compress your manga to .cbz format? (Y/n): " yn
     	case $yn in
-    	    [Yy]*) cbz_compress && echo "Happy fapping!" && exit ;;
+    	    [Yy]*) cbz_compress ;;
     	    [Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && echo "Happy fapping!" && exit ;;
     	    *) cbz_compress ;;
     	esac
 	done
 }
 
+collector () {
+	COLLECTNUM=1
+	for i in $(seq 400000); do
+		yes | download $COLLECTNUM
+		PAGENUM="$(expr $COLLECTNUM + 1)"
+	done
+}
+
 nhdl_search () {
 	echo "Searching for \"$2\""
 	QUERY="$(echo $2 | sed 's/ /+/g')"
-	curl -s "https://nhentai.net/search/?q=$QUERY"
+	read -p "Sort by recent or most popular (r/p)?: " rp
+	case $rp in
+		[Pp]*) SORT="popular" ;;
+		[Rr]*) SORT="recent" ;;
+	esac
+	curl -s "https://nhentai.net/search/?q="$QUERY"&sort="$SORT"" | sed "s/.*content//;s/image.*//" | fzf
 }
 
 nhdl_help () {
@@ -80,6 +105,7 @@ nhdl_help () {
 if [ $# -eq 0 ]; then nhdl_help; fi
 
 case "$1" in
+	--collect-all) collector ;;
 	-d) download "$@" ;;
 	-h) nhdl_help ;;
 	--help) nhdl_help ;;
