@@ -1,12 +1,24 @@
 #!/bin/sh
 
+#check if user wants to clean up a terminated download with ^C
+trap ctrl_c INT
+ctrl_c () {
+    read -p " Download terminated. Clean up unfinished download? (Y/n): " yn
+	case $yn in
+    	[Yy]*) if [ "$TITLE" = "" ]; then exit; else rm -rf "$BOOKDIR/$TITLE" && echo "Manga successfully deleted!" && exit; fi ;;
+    	[Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && echo "Happy fapping!" && exit ;;
+    	*) rm -rf "$BOOKDIR/$TITLE" && echo "Manga successfully deleted!" && exit ;;
+    esac
+}
+
 cbz_compress () {
-	TITLE=$(grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' tempindex)
+	TITLE="$(grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' tempindex | sed "s|/||g" | sed "s/&#x27;/'/g" | sed "s/|/--/g")"
+	rm tempindex
 	cd "$BOOKDIR"
 	zip -r "$TITLE".cbz "$TITLE/" > /dev/null
 	rm -rf "$TITLE"
 	echo "Happy fapping!"
-	exit
+	return
 }
 
 download () {
@@ -15,7 +27,12 @@ download () {
 	else
 		CODE="$2"
 	fi
-
+	if [ -d "$HOME/.cache/nhdl" ]; then
+		true
+	else
+		mkdir -p "$HOME/.cache/nhdl"
+	fi
+	echo $CODE >> $HOME/.cache/nhdl/history
 	BOOKDIR="$(cat $HOME/.config/nhdl/books.dir)"
 	if [ -d "$BOOKDIR" ]; then
 		printf "Book will be stored in $BOOKDIR/\n\n"
@@ -30,20 +47,27 @@ download () {
 
 	#check if manga exists
 	if [ "$(echo "$CODE" | sed 's/[0-9]*//')" = "" ]; then
-		curl -sfL "https://www.nhentai.net/g/$CODE" > /dev/null
+		true
+	else
+		echo "Invalid code!"
+		return
 	fi
-	
 	cd "$BOOKDIR"
-	
-	TITLE="$(curl -s "https://nhentai.net/g/$CODE/" | grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' | sed "s|/||g" | sed "s/&#x27;/'/g")"
-	echo Downloading \"$TITLE\"
+	TITLE="$(curl -s "https://nhentai.net/g/$CODE/" | grep -Po '(?<=</span><span class="pretty">).*(?=</span></h1><h2 class="title"><span class="before">)' | sed 's/span><span class="after">//g' | sed 's/<//' | sed "s|/||g" | sed "s/&#x27;/'/g" | sed "s/|/--/g")"
+	if [ "$TITLE" = "" ]; then
+		echo "Invalid code!"
+		return
+	fi
+	echo Downloading \"$TITLE\" "($CODE)"
+
+	#check if manga was already DLed
 	if [ -d "$TITLE" ]; then
 		FILENUM=$(ls -1 "$TITLE" | wc -l)
 		read -p "Directory already exists, with a total of $FILENUM pages downloaded. Erase and continue? (y/N): " yn
     	case $yn in
         	[Yy]*) rm -rf "$TITLE" ;;
-        	[Nn]*) exit ;;
-        	*) exit ;;
+        	[Nn]*) return ;;
+        	*) return ;;
 		esac
 	fi
 	mkdir "$TITLE"
@@ -52,38 +76,45 @@ download () {
 		read -p "CBZ file already exists. Erase and continue? (y/N): " yn
     	case $yn in
         	[Yy]*) rm "$TITLE".cbz && echo "Manga erased! Redownloading..." ;;
-        	[Nn]*) exit ;;
-        	*) exit ;;
+        	[Nn]*) return ;;
+        	*) return ;;
 		esac
 	fi
 	curl -s "https://nhentai.net/g/$CODE/" -o tempindex
-	
+
 	PAGENUM=1
 	PAGECOUNT=$(grep -Po '(?<="name"\>)[0-9]*(?=\<\/span)' tempindex)
 	GYARU="$(sed "s/.*galleries//;s/cover.*//" tempindex | sed "s|/||g" | head -n 5 | tail -n 1)"
 	echo ""
 	for i in $(seq $PAGECOUNT); do
-		printf "%s\n" "Downloading page $PAGENUM"
+		printf "%s\n" "Downloading page $PAGENUM of $PAGECOUNT"
 		wget -q "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.jpg" || wget -q "https://i.nhentai.net/galleries/$GYARU/$PAGENUM.png"
 		PAGENUM="$(expr $PAGENUM + 1)"
 	done
 	echo ""
-	while true; do
-    	read -p "Would you like to compress your manga to .cbz format? (Y/n): " yn
-    	case $yn in
-    	    [Yy]*) cbz_compress ;;
-    	    [Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && echo "Happy fapping!" && exit ;;
-    	    *) cbz_compress ;;
-    	esac
-	done
+	SOFAR=$(cat "$HOME/.cache/nhdl/history" | wc -l)
+	echo "Doujins downloaded thus far: $SOFAR"
+	if [ $SOFAR = 100 ]; then
+		echo "Wow! 100! What a coomer!"
+	fi
+    read -p "Would you like to compress your manga to .cbz format? (Y/n): " yn
+    case $yn in
+    	[Yy]*) cbz_compress ;;
+    	[Nn]*) rm "$BOOKDIR/$TITLE/tempindex" && echo "Happy fapping!" && return ;;
+    	*) cbz_compress ;;
+    esac
 }
 
 collector () {
 	COLLECTNUM=1
-	for i in $(seq 400000); do
+	RESULTS="$(curl -s "https://nhentai.net/search/?q=." | grep -o -P "[0-9]{3},[0-9]{3} results" | sed "s/,//" | sed "s/ results//")"
+	TOTAL="$(expr $RESULTS + 6159)"
+	for i in $(seq $TOTAL); do
 		yes | download $COLLECTNUM
-		PAGENUM="$(expr $COLLECTNUM + 1)"
+		COLLECTNUM="$(expr $COLLECTNUM + 1)"
 	done
+	echo "Wow! You're done collecting every manga!"
+	return
 }
 
 nhdl_search () {
@@ -98,7 +129,7 @@ nhdl_search () {
 }
 
 nhdl_help () {
-	printf "nHentai Manga Downloader (nhdl) by swindlesmccoop\n\nUsage: nhdl [-dh] [code]\n-d, --download: (D)ownload [code] of the manga's gallery\n-h, --help: Print this (h)elp message\n" && exit 1
+	printf "nHentai Manga Downloader (nhdl) by swindlesmccoop\n\nUsage: nhdl [-dh] [code]\n-d, --download: (D)ownload [code] of the manga's gallery\n-h, --help: Print this (h)elp message\n" && return 1
 }
 
 #if no parameters are supplied, print help
