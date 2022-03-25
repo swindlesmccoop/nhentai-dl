@@ -12,7 +12,7 @@ ctrl_c () {
 }
 
 cbz_compress () {
-	TITLE="$(grep -Po '(?<=<meta itemprop="name" content=").*(?=" /><meta itemprop="image")' tempindex | sed "s|/||g" | sed "s/&#x27;/'/g" | sed "s/|/--/g")"
+	TITLE="$(grep -Po '(?<=</span><span class="pretty">).*(?=</span></h1><h2 class="title"><span class="before">)' tempindex | sed 's/span><span class="after">//g' | sed 's/<//' | sed "s|/||g" | sed "s/&#x27;/'/g" | sed "s/|/--/g")"
 	rm tempindex
 	cd "$BOOKDIR"
 	zip -r "$TITLE".cbz "$TITLE/" > /dev/null
